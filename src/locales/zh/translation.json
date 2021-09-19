@@ -65,7 +65,7 @@
   "Vault-DepositsRetiredMsg": "该金库已退役,请儘速提出您的资金",
   "Vault-Staked": "已质押",
   "Vault-Description": "使用: {{vault}}",
-  "Vault-Network": "选取网路",
+  "Vault-Network": "选择网络",
   "Vault-Experimental": "试验版",
   "Vault-Loading": "加载金库",
   "Vault-NotFound": "未找到金库{{vaultId}}",
