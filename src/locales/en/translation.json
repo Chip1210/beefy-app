@@ -59,10 +59,14 @@
   "Vault-DepositsPausedTitle": "Deposits paused",
   "Vault-DepositsPausedMsg": "Deposits are paused for this vault.",
   "Vault-DepositsRetiredTitle": "RETIRED",
+  "Vault-DepositsRetiredUpgradeTitle": "RETIRED - We have upgraded this vault please move to the new and improved version",
   "Vault-DepositsRetiredRewardsTitle": "RETIRED - Underlying platform stopped rewards.",
   "Vault-DepositsRetiredExploitTitle": "RETIRED - Token has been exploited, funds are SAFU in vault.",
   "Vault-DepositsRetiredTVLTitle": "RETIRED - TVL is too low.",
-  "Vault-DepositsRetiredMsg": "Vault retired, withdraw your funds ASAP",
+  "Vault-DepositsRetiredMsg": "Vault retired, please withdraw your funds",
+  "Vault-LiquidityWarningTitle": "{{name}} overborrowed, please check {{platform}} for when you can withdraw.",
+  "Vault-LendingWarningTitle": "Uses leverage, please read the docs before depositing.",
+  "Vault-GeneralWarningTitle": "Please DYOR before depositing.",
   "Vault-Staked": "Staked",
   "Vault-Description": "Uses: {{vault}}",
   "Vault-Network": "Select Network",
@@ -85,6 +89,7 @@
   "Vault-Banner-CakeV2-SmarterValue": "{{count}}+ annual compounds",
   "Vault-Banner-CakeV2-FairerLabel": "Fairer",
   "Vault-Banner-CakeV2-FairerValue": "{{percent}}% less fees",
+  "Vault-Withdrawal-Platform-Notice-Geist": "Please set your gas limit to 9.9M when trying to withdraw. Anything 10M or over will fail.",
   "Vaults-Back": "Back to vaults",
   "Hide-Zero-Balances": "Hide Zero Balances",
   "Hide-Zero-Vault-Balances": "Deposited Vaults",
@@ -110,7 +115,8 @@
   "stats": "stats",
   "app": "app",
   "socials": "socials",
-  "buy": "buy",
+  "buy": "Buy Crypto",
+  "insure": "insure",
   "products": "products",
   "Powered-By": "POWERED BY",
   "IFO-Guide": "IFO Guide",
@@ -143,8 +149,35 @@
   "Add-Liquidity": "Add Liquidity",
   "Remove-Liquidity": "Remove Liquidity",
   "Buy-Token": "Buy Token",
+  "Mint-Token": "Mint Token",
   "Wrap-BNB": "Wrap BNB",
   "Boost": "Boost",
   "Experimental": "Experimental",
-  "Select-Network": "Select Network"
+  "Select-Network": "Select Network",
+  "InsurAce-Title": "InsurAce Vault Insurance",
+  "InsurAce-Sections": [
+    {
+      "title": "What is InsurAce?",
+      "content": [
+        "InsurAce.io is a decentralized insurance protocol operating across multiple blockchains. It provides insurance services to DeFi users to protect their investments against smart contract risks."
+      ]
+    },
+    {
+      "title": "How it works",
+      "content": [
+        "Beefy contracts deposit tokens on your behalf, to underlying platforms, for example Pancakeswap, TraderJoe, or Spookyswap. If one of Beefy’s smart contracts fails (for example our vault contract, or the strategy contract) and you were paying for coverage, InsurAce will cover your loss.",
+        "Contrarily if the smart contract that fails belongs to the underlying platform (Pancakeswap, Traderjoe, Spookyswap) your deposits won’t be covered."
+      ]
+    },
+    {
+      "title": "What is the premium?",
+      "content": [
+        "2.9% annually. Use our custom Beefy link to enjoy a 10% discount (paid in Insur Token)."
+      ]
+    }
+  ],
+  "InsurAce-Button": "Insure Vaults",
+  "V2Banner-Title": "This app will soon be replaced with Beefy’s updated v2 interface.",
+  "V2Banner-Text": "No user actions are required. You can try the new version now.",
+  "V2Banner-Button": "Try the Beta"
 }

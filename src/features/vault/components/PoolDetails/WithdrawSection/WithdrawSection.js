@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/anchor-is-valid */
 import React, { useState, useMemo, useEffect } from 'react';
 import useDeepCompareEffect from 'use-deep-compare-effect';
 import Grid from '@material-ui/core/Grid';
@@ -34,7 +35,7 @@ const useStyles = makeStyles(styles);
 const nativeCoin = getNetworkCoin();
 
 const WithdrawSection = ({ pool, index, sharesBalance }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const classes = useStyles();
   const { web3, address } = useConnectWallet();
   const { enqueueSnackbar } = useSnackbar();
@@ -78,7 +79,7 @@ const WithdrawSection = ({ pool, index, sharesBalance }) => {
     }
 
     return outputs;
-  }, [pool.tokenAddress]);
+  }, [pool.assets, pool.name, pool.token, pool.tokenAddress, pool.tokenDecimals, pool.zap]);
 
   const [withdrawSettings, setWithdrawSettings] = useState({
     isZap: false,
@@ -180,7 +181,7 @@ const WithdrawSection = ({ pool, index, sharesBalance }) => {
   };
 
   const handleInputAmountChange = event => {
-    const input = event.target.value.replace(/[,]+/, '').replace(/[^0-9\.]+/, '');
+    const input = event.target.value.replace(/[,]+/, '').replace(/[^0-9.]+/, '');
     let amount = new BigNumber(input);
 
     if (amount.isNaN()) amount = new BigNumber(0);
@@ -206,7 +207,7 @@ const WithdrawSection = ({ pool, index, sharesBalance }) => {
       ...prevState,
       isNeedApproval: prevState.isZap && allowance.isZero(),
     }));
-  }, [tokens[pool.earnedToken].allowance[withdrawSettings.withdrawAddress]]);
+  }, [pool.earnedToken, tokens, withdrawSettings.withdrawAddress]);
 
   const handleApproval = () => {
     fetchApproval({
@@ -313,6 +314,9 @@ const WithdrawSection = ({ pool, index, sharesBalance }) => {
     }
   };
 
+  const withrawalNoticeKey = `Vault-Withdrawal-Platform-Notice-${pool.platform}`;
+  const withdrawalNotice = !sharesBalance.isZero() && i18n.exists(withrawalNoticeKey);
+
   return (
     <Grid
       item
@@ -411,6 +415,15 @@ const WithdrawSection = ({ pool, index, sharesBalance }) => {
                   </Button>
                 )}
               </div>
+            )}
+            {/* Display a platform-specific withdrawal notice */}
+            {/* NOTE: Temporary hack until better solution is found */}
+            {withdrawalNotice ? (
+              <div className={classes.withdrawalNoticeContainer}>
+                <div className={classes.withdrawalNotice}>{t(withrawalNoticeKey)}</div>
+              </div>
+            ) : (
+              ''
             )}
             <div className={classes.zapNote}>
               <span>{t('Vault-WithdrawScenario')}&nbsp;</span>

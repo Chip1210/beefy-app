@@ -2,45 +2,41 @@
 import { MultiCall } from 'eth-multicall';
 import { addressBook } from 'blockchain-addressbook';
 import Web3 from 'web3';
+import BigNumber from 'bignumber.js';
 
 import { isEmpty } from '../src/features/helpers/utils.js';
 import { isValidChecksumAddress, maybeChecksumAddress } from './utils.js';
-import { bscPools } from '../src/features/configure/vault/bsc_pools.js';
-import { hecoPools } from '../src/features/configure/vault/heco_pools.js';
-import { avalanchePools } from '../src/features/configure/vault/avalanche_pools.js';
-import { polygonPools } from '../src/features/configure/vault/polygon_pools.js';
-import { fantomPools } from '../src/features/configure/vault/fantom_pools.js';
-import { harmonyPools } from '../src/features/configure/vault/harmony_pools.js';
-import { arbitrumPools } from '../src/features/configure/vault/arbitrum_pools.js';
 import { vaultABI, strategyABI } from '../src/features/configure/abi.js';
-
-const chainPools = {
-  bsc: bscPools,
-  heco: hecoPools,
-  avax: avalanchePools,
-  polygon: polygonPools,
-  fantom: fantomPools,
-  one: harmonyPools,
-  arbitrum: arbitrumPools,
-};
-
-const chainRpcs = {
-  bsc: process.env.BSC_RPC || 'https://bsc-dataseed.binance.org/',
-  heco: process.env.HECO_RPC || 'https://http-mainnet.hecochain.com',
-  avax: process.env.AVAX_RPC || 'https://api.avax.network/ext/bc/C/rpc',
-  polygon: process.env.POLYGON_RPC || 'https://polygon-rpc.com',
-  fantom: process.env.FANTOM_RPC || 'https://rpc.ftm.tools/',
-  one: process.env.HARMONY_RPC || 'https://api.s0.t.hmny.io/',
-  arbitrum: process.env.ARBITRUM_RPC || 'https://arb1.arbitrum.io/rpc',
-};
+import { chainPools, chainRpcs } from './config.js';
 
 const overrides = {
   'bunny-bunny-eol': { keeper: undefined, stratOwner: undefined },
   'blizzard-xblzd-bnb-old-eol': { keeper: undefined },
   'blizzard-xblzd-busd-old-eol': { keeper: undefined },
-  'heco-bifi-maxi': { beefyFeeRecipient: undefined },
+  'heco-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'polygon-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'avax-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'bifi-maxi': { stratOwner: undefined }, // harvester 0xDe30
   'beltv2-4belt': { vaultOwner: undefined }, // moonpot deployer
+  'cronos-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'metis-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'aurora-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'fuse-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+  'moonbeam-bifi-maxi': { beefyFeeRecipient: undefined }, // 0x0
+
+  // TODO delete
+  'kyber-usdc-jeur': { keeper: undefined, stratOwner: undefined }, // 0x0
+  'kyber-usdc-jgbp': { keeper: undefined, stratOwner: undefined }, // 0x0
+  'kyber-usdc-jchf': { keeper: undefined, stratOwner: undefined }, // 0x0
 };
+
+const oldValidOwners = [
+  addressBook.fantom.platforms.beefyfinance.devMultisig,
+  addressBook.polygon.platforms.beefyfinance.devMultisig,
+  addressBook.arbitrum.platforms.beefyfinance.devMultisig,
+];
+
+const oldValidFeeRecipients = {};
 
 const validatePools = async () => {
   const addressFields = ['tokenAddress', 'earnedTokenAddress', 'earnContractAddress'];
@@ -66,10 +62,8 @@ const validatePools = async () => {
 
     // Populate some extra data.
     const web3 = new Web3(chainRpcs[chain]);
-    pools = await populateStrategyAddrs(chain, pools, web3);
-    pools = await populateKeepers(chain, pools, web3);
-    pools = await populateBeefyFeeRecipients(chain, pools, web3);
-    pools = await populateOwners(chain, pools, web3);
+    pools = await populateVaultsData(chain, pools, web3);
+    pools = await populateStrategyData(chain, pools, web3);
 
     pools = override(pools);
     pools.forEach(pool => {
@@ -119,6 +113,18 @@ const validatePools = async () => {
           : 1;
       }
 
+      if (!pool.createdAt) {
+        console.error(
+          `Error: ${pool.id} : Pool createdAt timestamp missing - required for UI: vault sorting`
+        );
+        exitCode = 1;
+      } else if (isNaN(pool.createdAt)) {
+        console.error(
+          `Error: ${pool.id} : Pool createdAt timestamp wrong type, should be a number`
+        );
+        exitCode = 1;
+      }
+
       addressFields.forEach(field => {
         if (pool.hasOwnProperty(field) && !isValidChecksumAddress(pool[field])) {
           const maybeValid = maybeChecksumAddress(pool[field]);
@@ -133,6 +139,17 @@ const validatePools = async () => {
 
       if (pool.status === 'active') {
         activePools++;
+      }
+
+      if (new BigNumber(pool.totalSupply).isZero()) {
+        if (pool.status !== 'eol') {
+          console.error(`Error: ${pool.id} : Pool is empty`);
+          exitCode = 1;
+          if (!('emptyVault' in updates)) updates['emptyVault'] = {};
+          updates.emptyVault[pool.id] = pool.earnContractAddress;
+        } else {
+          console.warn(`${pool.id} : eol pool is empty`);
+        }
       }
 
       uniquePoolId.add(pool.id);
@@ -174,7 +191,7 @@ const validatePools = async () => {
 
 // Validation helpers. These only log for now, could throw error if desired.
 const isKeeperCorrect = (pool, chain, chainKeeper, updates) => {
-  if (pool.keeper !== undefined && pool.keeper !== chainKeeper) {
+  if (pool.status !== 'eol' && pool.keeper !== undefined && pool.keeper !== chainKeeper) {
     console.log(`Pool ${pool.id} should update keeper. From: ${pool.keeper} To: ${chainKeeper}`);
 
     if (!('keeper' in updates)) updates['keeper'] = {};
@@ -191,7 +208,8 @@ const isKeeperCorrect = (pool, chain, chainKeeper, updates) => {
 };
 
 const isStratOwnerCorrect = (pool, chain, owner, updates) => {
-  if (pool.stratOwner !== undefined && pool.keeper !== undefined && pool.stratOwner !== owner) {
+  const validOwners = [...oldValidOwners, owner];
+  if (pool.stratOwner !== undefined && !validOwners.includes(pool.stratOwner)) {
     console.log(`Pool ${pool.id} should update strat owner. From: ${pool.stratOwner} To: ${owner}`);
 
     if (!('stratOwner' in updates)) updates['stratOwner'] = {};
@@ -208,7 +226,8 @@ const isStratOwnerCorrect = (pool, chain, owner, updates) => {
 };
 
 const isVaultOwnerCorrect = (pool, chain, owner, updates) => {
-  if (pool.vaultOwner !== undefined && pool.vaultOwner !== owner) {
+  const validOwners = [...oldValidOwners, owner];
+  if (pool.vaultOwner !== undefined && !validOwners.includes(pool.vaultOwner)) {
     console.log(`Pool ${pool.id} should update vault owner. From: ${pool.vaultOwner} To: ${owner}`);
 
     if (!('vaultOwner' in updates)) updates['vaultOwner'] = {};
@@ -225,17 +244,16 @@ const isVaultOwnerCorrect = (pool, chain, owner, updates) => {
 };
 
 const isBeefyFeeRecipientCorrect = (pool, chain, recipient, updates) => {
+  const validRecipients = oldValidFeeRecipients[chain] || [];
   if (
     pool.status === 'active' &&
     pool.beefyFeeRecipient !== undefined &&
-    pool.beefyFeeRecipient !== recipient
+    pool.beefyFeeRecipient !== recipient &&
+    !validRecipients.includes(pool.beefyFeeRecipient)
   ) {
     console.log(
       `Pool ${pool.id} should update beefy fee recipient. From: ${pool.beefyFeeRecipient} To: ${recipient}`
     );
-
-    // TODO enable after updating Harmony beefyFeeRecipient
-    if (chain === 'one') return updates;
 
     if (!('beefyFeeRecipient' in updates)) updates['beefyFeeRecipient'] = {};
     if (!(chain in updates.beefyFeeRecipient)) updates.beefyFeeRecipient[chain] = {};
@@ -252,91 +270,64 @@ const isBeefyFeeRecipientCorrect = (pool, chain, recipient, updates) => {
 
 // Helpers to populate required addresses.
 
-const populateStrategyAddrs = async (chain, pools, web3) => {
+const populateVaultsData = async (chain, pools, web3) => {
   const multicall = new MultiCall(web3, addressBook[chain].platforms.beefyfinance.multicall);
 
   const calls = pools.map(pool => {
     const vaultContract = new web3.eth.Contract(vaultABI, pool.earnContractAddress);
     return {
       strategy: vaultContract.methods.strategy(),
+      owner: vaultContract.methods.owner(),
+      totalSupply: vaultContract.methods.totalSupply(),
     };
   });
 
   const [results] = await multicall.all([calls]);
 
   return pools.map((pool, i) => {
-    return { ...pool, strategy: results[i].strategy };
+    return {
+      ...pool,
+      strategy: results[i].strategy,
+      owner: results[i].owner,
+      totalSupply: results[i].totalSupply,
+    };
   });
 };
 
-const populateKeepers = async (chain, pools, web3) => {
+const populateStrategyData = async (chain, pools, web3) => {
   const multicall = new MultiCall(web3, addressBook[chain].platforms.beefyfinance.multicall);
 
   const calls = pools.map(pool => {
     const stratContract = new web3.eth.Contract(strategyABI, pool.strategy);
     return {
       keeper: stratContract.methods.keeper(),
-    };
-  });
-
-  const [results] = await multicall.all([calls]);
-
-  return pools.map((pool, i) => {
-    return { ...pool, keeper: results[i].keeper };
-  });
-};
-
-const populateBeefyFeeRecipients = async (chain, pools, web3) => {
-  const multicall = new MultiCall(web3, addressBook[chain].platforms.beefyfinance.multicall);
-
-  const calls = pools.map(pool => {
-    const stratContract = new web3.eth.Contract(strategyABI, pool.strategy);
-    return {
       beefyFeeRecipient: stratContract.methods.beefyFeeRecipient(),
-    };
-  });
-
-  const [results] = await multicall.all([calls]);
-
-  return pools.map((pool, i) => {
-    return { ...pool, beefyFeeRecipient: results[i].beefyFeeRecipient };
-  });
-};
-
-const populateOwners = async (chain, pools, web3) => {
-  const multicall = new MultiCall(web3, addressBook[chain].platforms.beefyfinance.multicall);
-
-  const vaultCalls = pools.map(pool => {
-    const vaultContract = new web3.eth.Contract(vaultABI, pool.earnContractAddress);
-    return {
-      owner: vaultContract.methods.owner(),
-    };
-  });
-
-  const stratCalls = pools.map(pool => {
-    const stratContract = new web3.eth.Contract(strategyABI, pool.strategy);
-    return {
       owner: stratContract.methods.owner(),
     };
   });
 
-  const [vaultResults] = await multicall.all([vaultCalls]);
-  const [stratResults] = await multicall.all([stratCalls]);
+  const [results] = await multicall.all([calls]);
 
   return pools.map((pool, i) => {
-    return { ...pool, vaultOwner: vaultResults[i].owner, stratOwner: stratResults[i].owner };
+    return {
+      ...pool,
+      keeper: results[i].keeper,
+      beefyFeeRecipient: results[i].beefyFeeRecipient,
+      stratOwner: results[i].owner,
+    };
   });
 };
 
 const override = pools => {
   Object.keys(overrides).forEach(id => {
-    const pool = pools.find(p => p.id === id);
-    if (pool) {
-      const override = overrides[id];
-      Object.keys(override).forEach(key => {
-        pool[key] = override[key];
+    pools
+      .filter(p => p.id.includes(id))
+      .forEach(pool => {
+        const override = overrides[id];
+        Object.keys(override).forEach(key => {
+          pool[key] = override[key];
+        });
       });
-    }
   });
   return pools;
 };
